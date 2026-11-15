@@ -1,0 +1,6 @@
+{
+  "name": "HydroNexus — IMC Water Management",
+  "description": "Intelligent Water Management & Municipal Infrastructure Monitoring Platform exclusively for Indore Municipal Corporation (IMC), Madhya Pradesh, India.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

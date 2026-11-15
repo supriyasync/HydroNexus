@@ -1,0 +1,164 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MunicipalUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  fullName     String
+  designation  String   @default("Municipal Water Operator")
+  department   String   @default("Indore Municipal Corporation (IMC) Water Works")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Facility {
+  id                    String   @id @default(cuid())
+  code                  String   @unique
+  name                  String
+  type                  String // RESERVOIR | STORAGE_TANK | TREATMENT_PLANT | PUMPING_STATION | DISTRIBUTION_NODE | PIPELINE_JUNCTION | SENSOR_POINT
+  locality              String
+  latitude              Float
+  longitude             Float
+  capacityMld           Float?
+  storageCapacityLiters Float?
+  currentStorageLiters  Float?
+  operationalStatus     String   @default("OPERATIONAL") // OPERATIONAL | MONITORING | MAINTENANCE | OFFLINE
+  provenanceStatus      String // VERIFIED_PUBLIC | APPROXIMATE_PUBLIC | DEMONSTRATION
+  sourceReference       String
+  description           String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  sensors             Sensor[]
+  readings            SensorReading[]
+  alerts              Alert[]
+  outgoingConnections FacilityConnection[] @relation("FromFacility")
+  incomingConnections FacilityConnection[] @relation("ToFacility")
+
+  @@index([type])
+  @@index([provenanceStatus])
+}
+
+model FacilityConnection {
+  id                 String   @id @default(cuid())
+  fromFacilityId     String
+  toFacilityId       String
+  pipelineLabel      String
+  diameterMm         Int?
+  verificationStatus String // VERIFIED_ROUTE | APPROXIMATE_ROUTE | SIMULATED_LINK
+  sourceReference    String
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  fromFacility Facility @relation("FromFacility", fields: [fromFacilityId], references: [id], onDelete: Cascade)
+  toFacility   Facility @relation("ToFacility", fields: [toFacilityId], references: [id], onDelete: Cascade)
+
+  @@index([fromFacilityId])
+  @@index([toFacilityId])
+}
+
+model Sensor {
+  id            String    @id @default(cuid())
+  sensorCode    String    @unique
+  name          String
+  kind          String // INLET_FLOW | OUTLET_FLOW | PRESSURE | LEVEL
+  unit          String
+  status        String    @default("DEMO") // CONNECTED | DISCONNECTED | DEMO | UNAVAILABLE | STALE
+  isSimulated   Boolean   @default(true)
+  facilityId    String
+  lastReadingAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
+}
+
+model SensorReading {
+  id             String   @id @default(cuid())
+  facilityId     String
+  inletFlow      Float
+  outletFlow     Float
+  flowDifference Float
+  pressureBar    Float
+  dataSource     String // DEMO | LIVE_ESP32
+  isValid        Boolean  @default(true)
+  recordedAt     DateTime @default(now())
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId, recordedAt])
+  @@index([recordedAt])
+  @@index([dataSource])
+}
+
+model Alert {
+  id                 String   @id @default(cuid())
+  alertCode          String   @unique
+  category           String // NORMAL_OPERATION | ABNORMAL_FLOW_DIFFERENCE | UNUSUAL_PRESSURE_VARIATION | POSSIBLE_LEAKAGE_VERIFICATION_REQUIRED | SENSOR_DISCONNECTED | ESP32_DISCONNECTED | API_CONNECTION_LOST | STALE_SENSOR_DATA | INVALID_SENSOR_READINGS
+  severity           String // GREEN | AMBER | RED
+  status             String   @default("NEW") // NEW | UNDER_INVESTIGATION | RESOLVED | DISMISSED
+  title              String
+  description        String
+  facilityId         String?
+  inletSnapshot      Float?
+  outletSnapshot     Float?
+  differenceSnapshot Float?
+  pressureSnapshot   Float?
+  dataSource         String   @default("DEMO")
+  detectedAt         DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  facility Facility?   @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  notes    AlertNote[]
+
+  @@index([status, severity])
+  @@index([detectedAt])
+  @@index([facilityId])
+}
+
+model AlertNote {
+  id         String   @id @default(cuid())
+  alertId    String
+  authorName String
+  note       String
+  createdAt  DateTime @default(now())
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+
+  @@index([alertId, createdAt])
+}
+
+model MonitoringThreshold {
+  id                        String   @id @default("default")
+  pressureMinBar            Float    @default(1.2)
+  pressureMaxBar            Float    @default(4.5)
+  pressureCriticalMaxBar    Float    @default(6.0)
+  flowDiffThresholdLpm      Float    @default(18.0)
+  flowAnomalyPersistenceSec Int      @default(15)
+  staleTimeoutSec           Int      @default(20)
+  isIllustrative            Boolean  @default(true)
+  updatedAt                 DateTime @updatedAt
+}
+
+model ApplicationSetting {
+  id               String   @id @default("default")
+  dataMode         String   @default("DEMO") // DEMO | LIVE
+  demoScenario     String   @default("NORMAL") // NORMAL | MILD_DISCREPANCY | PRESSURE_SPIKE | PRESSURE_DROP | SENSOR_DISCONNECTED | API_FAILURE
+  liveSensorApiUrl String   @default("")
+  pollIntervalMs   Int      @default(5000)
+  networkContext   String   @default("Indore Municipal Corporation (IMC) — Primary Distribution Monitoring Prototype")
+  updatedAt        DateTime @updatedAt
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@hydronexus/backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/ensure-ready.mjs && tsx src/server.ts",
+    "build": "tsc --noEmit && esbuild src/server.ts --bundle --platform=node --format=esm --outdir=dist --packages=external",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit",
+    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:push": "DATABASE_URL=\"file:./hydronexus.db\" prisma db push --schema=prisma/schema.prisma",
+    "db:seed": "tsx src/prisma/seed.ts",
+    "db:setup": "npm run prisma:generate && npm run db:push && npm run db:seed"
+  }
+}
